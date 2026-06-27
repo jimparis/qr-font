@@ -754,7 +754,7 @@ def write_demo(font_filename: str) -> None:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QR Font Demo</title>
+<title>Jim's TrueType QR Code Font</title>
 <style>
 @font-face {
   font-family: "QR Font";
@@ -770,6 +770,19 @@ main {
   max-width: 900px;
   margin: 48px auto;
   padding: 0 24px;
+}
+h1 {
+  margin: 0 0 14px;
+  font-size: 34px;
+  line-height: 1.15;
+}
+p {
+  line-height: 1.5;
+}
+.intro {
+  max-width: 760px;
+  margin: 0 0 28px;
+  color: #334155;
 }
 label {
   display: block;
@@ -809,16 +822,32 @@ textarea {
   color: #4b5563;
   font-size: 14px;
 }
+.links {
+  margin-top: 28px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+a {
+  color: #0f5fb8;
+}
 </style>
 </head>
 <body>
 <main>
+  <h1>Jim's TrueType QR Code Font</h1>
+  <p class="intro">This is a real TrueType/OpenType font that turns bracketed text into QR codes during text shaping. There is no separate image generation or preprocessing step: type text like <code>[hello]</code>, apply the font, and the font's built-in OpenType rules render the QR code.</p>
+  <p class="intro">Because the QR code is still text, you can copy and paste the rendered QR block as ordinary characters, store it in plain text, or mix it inline with regular Latin text. Text outside brackets remains readable.</p>
   <label for="text">Text</label>
   <textarea id="text" autocomplete="off" spellcheck="false">Hello [QR coded] world!
 Download this font: [http://qr.jim.sh/]</textarea>
   <p class="meta">Use printable ASCII inside square brackets, up to 17 characters per QR block. Text outside brackets remains ordinary Liberation Sans-derived text.</p>
   <div id="qr" class="qr">Hello [QR coded] world!
 Download this font: [http://qr.jim.sh/]</div>
+  <p class="links">
+    <a href="./__FONT_FILENAME__">Download the TrueType font</a>
+    <a href="https://git.jim.sh/jim/qr-font.git">Source repository</a>
+  </p>
 </main>
 <script>
 const input = document.getElementById("text");
