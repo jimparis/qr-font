@@ -27,7 +27,7 @@ MASK = 0
 RENDER_X_BIAS = 0
 MODULE_OVERPAINT = 8
 SUPPORTED_CODES = [c for c in range(32, 127) if c not in (ord("["), ord("]"))]
-LATIN_SCALE = 0.50
+LATIN_SCALE = 0.70
 LATIN_Y_SHIFT = 220
 
 QR_CONFIGS = {
@@ -418,14 +418,14 @@ def copy_base_glyph(
     source_width, _ = base_font["hmtx"][source_name]
     scaled_width = round(source_width * scale)
     if scaled_width > 0:
-        data.advance_widths[target_name] = max(MODULE, round(scaled_width / MODULE) * MODULE)
+        data.advance_widths[target_name] = scaled_width
     else:
         data.advance_widths[target_name] = 0
 
 
 def add_printable_base_glyphs(data: FontData, base_font_path: Path) -> None:
     base_font = TTFont(base_font_path)
-    scale = (ADVANCE / base_font["head"].unitsPerEm) * LATIN_SCALE
+    scale = LATIN_SCALE
     cmap = base_font.getBestCmap()
 
     notdef_name = ".notdef"
@@ -447,7 +447,7 @@ def add_printable_base_glyphs(data: FontData, base_font_path: Path) -> None:
         target_name = printable_names[code]
         source_name = cmap.get(code)
         if source_name is None:
-            add_empty(target_name, data, round(ADVANCE * LATIN_SCALE) if code == 32 else 0)
+            add_empty(target_name, data, round(base_font["head"].unitsPerEm * 0.25 * scale) if code == 32 else 0)
         else:
             copy_base_glyph(base_font, source_name, target_name, data, scale, LATIN_Y_SHIFT)
         data.cmap[code] = target_name
