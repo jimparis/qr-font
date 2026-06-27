@@ -1,0 +1,15 @@
+[project]
+name = "qr-font"
+version = "0.1.0"
+description = "Generate an experimental OpenType QR-code font."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fonttools>=4.57.0",
+]
+
+[dependency-groups]
+dev = [
+    "pillow>=12.2.0",
+    "uharfbuzz>=0.55.0",
+]
