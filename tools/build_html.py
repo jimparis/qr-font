@@ -138,7 +138,7 @@ input[type="number"] {
 .qr {
   margin-top: 32px;
   font-feature-settings: "rlig" 1, "kern" 1;
-  line-height: 1;
+  line-height: 1.2;
   color: #000;
   background: #fff;
   display: block;
