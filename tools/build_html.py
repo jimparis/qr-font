@@ -138,7 +138,7 @@ input[type="number"] {
 .qr {
   margin-top: 32px;
   font-feature-settings: "rlig" 1, "kern" 1;
-  line-height: 1;
+  line-height: 1.5;
   color: #000;
   background: #fff;
   display: block;
@@ -202,8 +202,8 @@ a {
     <div class="control-group font-size-control">
       <label for="size-slider">Font Size</label>
       <div class="slider-container">
-        <input type="range" id="size-slider" min="10" max="400" value="200">
-        <input type="number" id="size-input" min="10" max="400" value="200">
+        <input type="range" id="size-slider" min="10" max="300" value="100">
+        <input type="number" id="size-input" min="10" max="300" value="100">
         <span style="font-size: 15px; color: #4b5563;">px</span>
       </div>
     </div>
@@ -241,7 +241,7 @@ sizeInput.addEventListener("input", (e) => {
   let val = parseInt(e.target.value, 10);
   if (isNaN(val)) return;
   if (val < 10) val = 10;
-  if (val > 400) val = 400;
+  if (val > 300) val = 300;
   updateSize(val);
 });
 
