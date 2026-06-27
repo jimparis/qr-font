@@ -149,11 +149,8 @@ input[type="number"] {
   font-size: 222px;
   min-height: 222px;
 }
-.qr.mode-mono {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 18px;
-  min-height: 198px;
-  padding: 16px;
+.qr.mode-sans {
+  font-family: "Liberation Sans", system-ui, -apple-system, sans-serif;
 }
 .meta {
   margin-top: 10px;
@@ -183,7 +180,7 @@ a {
         <option value="1L">QR Font 1-L (up to 17 characters)</option>
         <option value="2L" selected>QR Font 2-L (up to 32 characters)</option>
         <option value="3L">QR Font 3-L (up to 53 characters)</option>
-        <option value="mono">Mono</option>
+        <option value="sans">Plain Sans (no QR parsing)</option>
       </select>
     </div>
     <div class="control-group font-size-control">
@@ -219,13 +216,8 @@ const sizeControl = document.querySelector(".font-size-control");
 function updateSize(value) {
   sizeSlider.value = value;
   sizeInput.value = value;
-  if (mode.value !== "mono") {
-    qr.style.fontSize = value + "px";
-    qr.style.minHeight = value + "px";
-  } else {
-    qr.style.fontSize = "";
-    qr.style.minHeight = "";
-  }
+  qr.style.fontSize = value + "px";
+  qr.style.minHeight = value + "px";
 }
 
 sizeSlider.addEventListener("input", (e) => updateSize(e.target.value));
@@ -241,18 +233,8 @@ function render() {
   const value = input.value;
   qr.replaceChildren(document.createTextNode(value));
   qr.className = `qr mode-${mode.value}`;
-  
-  if (mode.value === "mono") {
-    sizeControl.style.opacity = "0.4";
-    sizeControl.style.pointerEvents = "none";
-    qr.style.fontSize = "";
-    qr.style.minHeight = "";
-  } else {
-    sizeControl.style.opacity = "";
-    sizeControl.style.pointerEvents = "";
-    qr.style.fontSize = sizeSlider.value + "px";
-    qr.style.minHeight = sizeSlider.value + "px";
-  }
+  qr.style.fontSize = sizeSlider.value + "px";
+  qr.style.minHeight = sizeSlider.value + "px";
 }
 
 input.addEventListener("input", render);
