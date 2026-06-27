@@ -677,6 +677,10 @@ def generate_features(include_parity_circuit: bool = False) -> str:
             helper_lookups.append(f"    sub @byte_{pos:02d} by @byte_{pos:02d};")
         helper_lookups.append("} NoOp;")
         helper_lookups.append("")
+        helper_lookups.append("lookup HideClose useExtension {")
+        helper_lookups.append("    sub close_delim by empty;")
+        helper_lookups.append("} HideClose;")
+        helper_lookups.append("")
 
         # Generate Xor lookups using class-to-class substitutions and useExtension
         for contrib in range(1, 256):
@@ -732,7 +736,7 @@ def generate_features(include_parity_circuit: bool = False) -> str:
         for length in range(MAX_LEN + 1):
             helper_lookups.append(
                 f"lookup SetBase_{length:02d} useExtension {{ "
-                f"sub close_delim by qr_base_{length:02d}; "
+                f"sub header_bits by qr_base_{length:02d}; "
                 f"}} SetBase_{length:02d};"
             )
     else:
@@ -823,7 +827,11 @@ def generate_features(include_parity_circuit: bool = False) -> str:
         for length in range(MAX_LEN + 1):
             bit_fixed = fixed_parity_contribution(length, matrix)
             byte_fixed = bytes_from_bits(bit_fixed)
-            rule_parts = []
+            rule_parts = [f"header_bits' lookup SetBase_{length:02d}"]
+            if length == 0:
+                rule_parts.append("len_00' lookup NoOp")
+            else:
+                rule_parts.append("@byte_00' lookup NoOp")
             for j in range(EC_CODEWORDS):
                 contrib = byte_fixed[j]
                 if contrib:
@@ -833,7 +841,7 @@ def generate_features(include_parity_circuit: bool = False) -> str:
             for k in range(1, length):
                 rule_parts.append(f"@byte_{k:02d}' lookup NoOp")
             rule_parts.append(f"len_{length:02d}' lookup NoOp")
-            rule_parts.append(f"close_delim' lookup SetBase_{length:02d}")
+            rule_parts.append(f"close_delim' lookup HideClose")
             main_lines.append(f"    sub {' '.join(rule_parts)};")
         main_lines.append("} CloseQR;")
         main_lines.append("")
