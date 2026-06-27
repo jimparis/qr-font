@@ -1,7 +1,17 @@
 import argparse
 from pathlib import Path
+import hashlib
 
 DIST = Path("/home/jim/git/qr-font/dist")
+
+def file_hash(filepath: Path) -> str:
+    if not filepath.exists():
+        return "unknown"
+    h = hashlib.sha256()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()[:8]
 
 def write_demo(font_filenames: dict[str, str]) -> None:
     html = """<!doctype html>
@@ -10,18 +20,24 @@ def write_demo(font_filenames: dict[str, str]) -> None:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jim's TrueType QR Code Font</title>
+<link rel="preload" href="./__FONT_1L__" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="./__FONT_2L__" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="./__FONT_3L__" as="font" type="font/ttf" crossorigin>
 <style>
 @font-face {
   font-family: "QR Font 1-L";
   src: url("./__FONT_1L__") format("truetype");
+  font-display: block;
 }
 @font-face {
   font-family: "QR Font 2-L";
   src: url("./__FONT_2L__") format("truetype");
+  font-display: block;
 }
 @font-face {
   font-family: "QR Font 3-L";
   src: url("./__FONT_3L__") format("truetype");
+  font-display: block;
 }
 body {
   margin: 0;
@@ -186,8 +202,8 @@ a {
     <div class="control-group font-size-control">
       <label for="size-slider">Font Size</label>
       <div class="slider-container">
-        <input type="range" id="size-slider" min="20" max="400" value="200">
-        <input type="number" id="size-input" min="20" max="400" value="200">
+        <input type="range" id="size-slider" min="10" max="400" value="200">
+        <input type="number" id="size-input" min="10" max="400" value="200">
         <span style="font-size: 15px; color: #4b5563;">px</span>
       </div>
     </div>
@@ -224,7 +240,7 @@ sizeSlider.addEventListener("input", (e) => updateSize(e.target.value));
 sizeInput.addEventListener("input", (e) => {
   let val = parseInt(e.target.value, 10);
   if (isNaN(val)) return;
-  if (val < 20) val = 20;
+  if (val < 10) val = 10;
   if (val > 400) val = 400;
   updateSize(val);
 });
@@ -247,7 +263,10 @@ render();
 </html>
 """
     html = (
-        html.replace("__FONT_1L__", font_filenames["1L"])
+        html.replace("./__FONT_1L__", f"./{font_filenames['1L']}?h={file_hash(DIST / font_filenames['1L'])}")
+        .replace("./__FONT_2L__", f"./{font_filenames['2L']}?h={file_hash(DIST / font_filenames['2L'])}")
+        .replace("./__FONT_3L__", f"./{font_filenames['3L']}?h={file_hash(DIST / font_filenames['3L'])}")
+        .replace("__FONT_1L__", font_filenames["1L"])
         .replace("__FONT_2L__", font_filenames["2L"])
         .replace("__FONT_3L__", font_filenames["3L"])
     )

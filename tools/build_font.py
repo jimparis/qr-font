@@ -425,7 +425,7 @@ def copy_base_glyph(
 
 def add_printable_base_glyphs(data: FontData, base_font_path: Path) -> None:
     base_font = TTFont(base_font_path)
-    scale = LATIN_SCALE
+    scale = (UNITS_PER_EM / base_font["head"].unitsPerEm) * LATIN_SCALE
     cmap = base_font.getBestCmap()
 
     notdef_name = ".notdef"
