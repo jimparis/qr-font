@@ -126,10 +126,10 @@ input[type="number"] {
   color: #000;
   background: #fff;
   display: block;
-  box-sizing: border-box;
+  box-sizing: content-box;
   width: 100%;
   min-height: 222px;
-  padding: 0;
+  padding: 12px 16px;
   overflow-x: auto;
   overflow-y: auto;
   white-space: pre-wrap;
@@ -197,10 +197,10 @@ a {
   </div>
   <label for="text">Text</label>
   <textarea id="text" autocomplete="off" spellcheck="false">Hello [QR coded] world!
-Download this font: [http://qr.jim.sh/]</textarea>
+This page: [http://qr.jim.sh/]</textarea>
   <p class="meta">Use printable ASCII inside square brackets. QR Font 1-L supports up to 17 characters per block; QR Font 2-L supports up to 32; QR Font 3-L supports up to 53. Text outside brackets remains ordinary Liberation Sans-derived text.</p>
   <div id="qr" class="qr mode-2L">Hello [QR coded] world!
-Download this font: [http://qr.jim.sh/]</div>
+This page: [http://qr.jim.sh/]</div>
   <p class="links">
     <a href="./__FONT_1L__">Download QR Font 1-L</a>
     <a href="./__FONT_2L__">Download QR Font 2-L</a>

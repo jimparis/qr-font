@@ -27,7 +27,7 @@ MASK = 0
 RENDER_X_BIAS = 0
 MODULE_OVERPAINT = 8
 SUPPORTED_CODES = [c for c in range(32, 127) if c not in (ord("["), ord("]"))]
-LATIN_SCALE = 0.70
+LATIN_SCALE = 1.00
 LATIN_Y_SHIFT = 220
 
 QR_CONFIGS = {
