@@ -40,7 +40,7 @@ QR_LABEL = "1L"
 QR_VERSION = 1
 QR_SIZE = 21
 ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
-UNITS_PER_EM = round(ADVANCE / 1.5)
+UNITS_PER_EM = ADVANCE
 ASCENT = ADVANCE
 DESCENT = 0
 MAX_LEN = 17
@@ -51,7 +51,6 @@ PARITY_BITS = EC_CODEWORDS * 8
 TOTAL_BITS = DATA_BITS + PARITY_BITS
 RS_GEN: list[int] = []
 
-
 def configure_qr(label: str) -> None:
     global QR_LABEL, QR_VERSION, QR_SIZE, ADVANCE, UNITS_PER_EM, ASCENT, DESCENT
     global MAX_LEN, DATA_CODEWORDS, EC_CODEWORDS, DATA_BITS, PARITY_BITS, TOTAL_BITS, RS_GEN
@@ -61,7 +60,7 @@ def configure_qr(label: str) -> None:
     QR_VERSION = config["version"]
     QR_SIZE = config["size"]
     ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
-    UNITS_PER_EM = round(ADVANCE / 1.5)
+    UNITS_PER_EM = ADVANCE
     ASCENT = ADVANCE
     DESCENT = 0
     MAX_LEN = config["max_len"]
