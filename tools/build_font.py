@@ -27,7 +27,7 @@ MASK = 0
 RENDER_X_BIAS = 0
 MODULE_OVERPAINT = 8
 SUPPORTED_CODES = [c for c in range(32, 127) if c not in (ord("["), ord("]"))]
-LATIN_SCALE = 0.20
+LATIN_SCALE = 0.50
 LATIN_Y_SHIFT = 220
 
 QR_CONFIGS = {
@@ -918,10 +918,12 @@ def build_ttf(font_data: FontData, feature_text: str, output: Path) -> None:
             "copyright": (
                 "Derived from Liberation Sans: digitized data copyright (c) 2010 "
                 "Google Corporation; copyright (c) 2012 Red Hat, Inc. QR Font "
-                "additions copyright their contributors."
+                "additions copyright their contributors. See https://qr.jim.sh/ for updates."
             ),
             "licenseDescription": "Licensed under the SIL Open Font License, Version 1.1.",
             "licenseInfoURL": "https://scripts.sil.org/OFL",
+            "designerURL": "https://qr.jim.sh/",
+            "vendorURL": "https://qr.jim.sh/",
         }
     )
     fb.setupPost(keepGlyphNames=True)

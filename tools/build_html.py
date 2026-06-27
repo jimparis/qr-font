@@ -64,11 +64,60 @@ textarea {
   font: 18px system-ui, sans-serif;
 }
 select {
-  margin-bottom: 14px;
+  width: 100%;
   padding: 8px 10px;
   border: 1px solid #b7c0cc;
   border-radius: 6px;
   font: 15px system-ui, sans-serif;
+  box-sizing: border-box;
+}
+.control-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.control-group {
+  flex: 1;
+  min-width: 200px;
+}
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+}
+input[type="range"] {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #cbd5e1;
+  outline: none;
+  -webkit-appearance: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0f5fb8;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="number"] {
+  width: 65px;
+  padding: 6px 8px;
+  border: 1px solid #b7c0cc;
+  border-radius: 6px;
+  font: 15px system-ui, sans-serif;
+  text-align: center;
+  box-sizing: border-box;
+}
+.font-size-control {
+  transition: opacity 0.2s ease;
 }
 .qr {
   margin-top: 32px;
@@ -127,13 +176,25 @@ a {
   <h1>Jim's TrueType QR Code Font</h1>
   <p class="intro">This is a real TrueType/OpenType font that turns bracketed text into QR codes during text shaping. There is no separate image generation or preprocessing step: type text like <code>[hello]</code>, apply the font, and the font's built-in OpenType rules render the QR code.</p>
   <p class="intro">Because the QR code is still text, you can copy and paste the rendered QR block as ordinary characters, store it in plain text, or mix it inline with regular Latin text. Text outside brackets remains readable.</p>
-  <label for="mode">Font</label>
-  <select id="mode">
-    <option value="1L">QR Font 1-L (up to 17 characters)</option>
-    <option value="2L" selected>QR Font 2-L (up to 32 characters)</option>
-    <option value="3L">QR Font 3-L (up to 53 characters)</option>
-    <option value="mono">Mono</option>
-  </select>
+  <div class="control-row">
+    <div class="control-group">
+      <label for="mode">Font</label>
+      <select id="mode">
+        <option value="1L">QR Font 1-L (up to 17 characters)</option>
+        <option value="2L" selected>QR Font 2-L (up to 32 characters)</option>
+        <option value="3L">QR Font 3-L (up to 53 characters)</option>
+        <option value="mono">Mono</option>
+      </select>
+    </div>
+    <div class="control-group font-size-control">
+      <label for="size-slider">Font Size</label>
+      <div class="slider-container">
+        <input type="range" id="size-slider" min="20" max="400" value="200">
+        <input type="number" id="size-input" min="20" max="400" value="200">
+        <span style="font-size: 15px; color: #4b5563;">px</span>
+      </div>
+    </div>
+  </div>
   <label for="text">Text</label>
   <textarea id="text" autocomplete="off" spellcheck="false">Hello [QR coded] world!
 Download this font: [http://qr.jim.sh/]</textarea>
@@ -151,11 +212,49 @@ Download this font: [http://qr.jim.sh/]</div>
 const input = document.getElementById("text");
 const mode = document.getElementById("mode");
 const qr = document.getElementById("qr");
+const sizeSlider = document.getElementById("size-slider");
+const sizeInput = document.getElementById("size-input");
+const sizeControl = document.querySelector(".font-size-control");
+
+function updateSize(value) {
+  sizeSlider.value = value;
+  sizeInput.value = value;
+  if (mode.value !== "mono") {
+    qr.style.fontSize = value + "px";
+    qr.style.minHeight = value + "px";
+  } else {
+    qr.style.fontSize = "";
+    qr.style.minHeight = "";
+  }
+}
+
+sizeSlider.addEventListener("input", (e) => updateSize(e.target.value));
+sizeInput.addEventListener("input", (e) => {
+  let val = parseInt(e.target.value, 10);
+  if (isNaN(val)) return;
+  if (val < 20) val = 20;
+  if (val > 400) val = 400;
+  updateSize(val);
+});
+
 function render() {
   const value = input.value;
   qr.replaceChildren(document.createTextNode(value));
   qr.className = `qr mode-${mode.value}`;
+  
+  if (mode.value === "mono") {
+    sizeControl.style.opacity = "0.4";
+    sizeControl.style.pointerEvents = "none";
+    qr.style.fontSize = "";
+    qr.style.minHeight = "";
+  } else {
+    sizeControl.style.opacity = "";
+    sizeControl.style.pointerEvents = "";
+    qr.style.fontSize = sizeSlider.value + "px";
+    qr.style.minHeight = sizeSlider.value + "px";
+  }
 }
+
 input.addEventListener("input", render);
 input.addEventListener("change", render);
 input.addEventListener("keyup", render);
