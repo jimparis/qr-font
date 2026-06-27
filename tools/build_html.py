@@ -20,6 +20,7 @@ def write_demo(font_filenames: dict[str, str]) -> None:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jim's TrueType QR Code Font</title>
+<link rel="icon" type="image/x-icon" href="./favicon.ico">
 <link rel="preload" href="./__FONT_1L__" as="font" type="font/ttf" crossorigin>
 <link rel="preload" href="./__FONT_2L__" as="font" type="font/ttf" crossorigin>
 <link rel="preload" href="./__FONT_3L__" as="font" type="font/ttf" crossorigin>
@@ -189,6 +190,7 @@ a {
   <h1>Jim's TrueType QR Code Font</h1>
   <p class="intro">This is a real TrueType/OpenType font that turns bracketed text into QR codes during text shaping. There is no separate image generation or preprocessing step: type text like <code>[hello]</code>, apply the font, and the font's built-in OpenType rules render the QR code.</p>
   <p class="intro">Because the QR code is still text, you can copy and paste the rendered QR block as ordinary characters, store it in plain text, or mix it inline with regular Latin text. Text outside brackets remains readable.</p>
+  <p class="intro"><strong>Browser Line-Wrapping Note:</strong> Because layout engines perform line-breaking on the Unicode text before shaping, browsers may split a QR code across lines if it contains break opportunities (like spaces, dots, or slashes) and hits the edge of a text container. For reliable rendering in HTML, wrap the bracketed block in a container styled with <code>white-space: nowrap;</code> or <code>display: inline-block;</code>.</p>
   <div class="control-row">
     <div class="control-group">
       <label for="mode">Font</label>
@@ -262,14 +264,11 @@ render();
 </body>
 </html>
 """
-    html = (
-        html.replace("./__FONT_1L__", f"./{font_filenames['1L']}?h={file_hash(DIST / font_filenames['1L'])}")
-        .replace("./__FONT_2L__", f"./{font_filenames['2L']}?h={file_hash(DIST / font_filenames['2L'])}")
-        .replace("./__FONT_3L__", f"./{font_filenames['3L']}?h={file_hash(DIST / font_filenames['3L'])}")
-        .replace("__FONT_1L__", font_filenames["1L"])
-        .replace("__FONT_2L__", font_filenames["2L"])
-        .replace("__FONT_3L__", font_filenames["3L"])
-    )
+    for label, filename in font_filenames.items():
+        font_path = DIST / filename
+        h = file_hash(font_path) if font_path.exists() else "0"
+        html = html.replace(f"./__FONT_{label}__", f"./{filename}?h={h}")
+        html = html.replace(f"__FONT_{label}__", filename)
     (DIST / "index.html").write_text(html, encoding="utf-8")
 
 def main() -> None:

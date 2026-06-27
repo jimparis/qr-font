@@ -30,6 +30,7 @@ SUPPORTED_CODES = [c for c in range(32, 127) if c not in (ord("["), ord("]"))]
 LATIN_SCALE = 1.00
 LATIN_Y_SHIFT = 220
 
+
 QR_CONFIGS = {
     "1L": {"version": 1, "size": 21, "data_codewords": 19, "ec_codewords": 7, "max_len": 17},
     "2L": {"version": 2, "size": 25, "data_codewords": 34, "ec_codewords": 10, "max_len": 32},
@@ -463,7 +464,7 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
     data.glyphs["header_bits"] = bit_group_glyph(
         ((i, bit) for i, bit in enumerate([0, 1, 0, 0])), coords
     )
-    data.advance_widths["header_bits"] = ADVANCE
+    data.advance_widths["header_bits"] = 0
 
     for i in range(8):
         add_empty(g_c(i), data)
@@ -479,7 +480,7 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
             bits = ((start + i, bit) for i, bit in enumerate(bits_of(code, 8)))
             data.glyph_order.append(name)
             data.glyphs[name] = bit_group_glyph(bits, coords)
-            data.advance_widths[name] = ADVANCE
+            data.advance_widths[name] = 0
 
     for length in range(MAX_LEN + 1):
         count_name = f"count_{length:02d}"
@@ -488,7 +489,7 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
             ((4 + i, bit) for i, bit in enumerate(bits_of(length, 8))),
             coords,
         )
-        data.advance_widths[count_name] = ADVANCE
+        data.advance_widths[count_name] = 0
 
         used = 12 + length * 8
         tail = close_tail_bits(length)
@@ -498,7 +499,7 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
             ((used + i, bit) for i, bit in enumerate(tail)),
             coords,
         )
-        data.advance_widths[tail_name] = ADVANCE
+        data.advance_widths[tail_name] = 0
 
         parity_name = f"parity_zero_{length:02d}"
         data.glyph_order.append(parity_name)
@@ -506,7 +507,7 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
             ((DATA_BITS + i, 0) for i in range(PARITY_BITS)),
             coords,
         )
-        data.advance_widths[parity_name] = ADVANCE
+        data.advance_widths[parity_name] = 0
 
         base_name = f"qr_base_{length:02d}"
         data.glyph_order.append(base_name)
@@ -526,6 +527,24 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
             data.glyphs[name] = square_glyph(row, col) if (bit ^ is_masked(row, col)) else empty_glyph()
             data.advance_widths[name] = 0
 
+    # Fused glyphs: p55_bit + qr_base_NN merged into one glyph.
+    # These are produced by the MergeAll ligature lookup.
+    last_parity_idx = PARITY_BITS - 1
+    last_row, last_col = coords[DATA_BITS + last_parity_idx]
+    for bit in (0, 1):
+        p55_draws = bool(bit ^ is_masked(last_row, last_col))
+        for length in range(MAX_LEN + 1):
+            name = f"qr_base_p55_{bit}_{length:02d}"
+            pen = TTGlyphPen(None)
+            for r, c in sorted(base_black_modules()):
+                draw_square(pen, r, c)
+            if p55_draws:
+                draw_square(pen, last_row, last_col)
+            data.glyph_order.append(name)
+            data.glyphs[name] = pen.glyph()
+            data.advance_widths[name] = ADVANCE
+
+
     return data
 
 
@@ -541,6 +560,11 @@ def grouped_internal_glyphs(include_parity_circuit: bool = False) -> list[str]:
         names.extend((f"count_{length:02d}", f"tail_{length:02d}"))
         if not include_parity_circuit:
             names.append(f"parity_zero_{length:02d}")
+    if include_parity_circuit:
+        for j in range(EC_CODEWORDS):
+            names.extend(f"s{j}_{val:03d}" for val in range(256))
+        for i in range(PARITY_BITS):
+            names.extend((g_p(i, 0), g_p(i, 1)))
     return names
 
 
@@ -865,6 +889,21 @@ def generate_features(include_parity_circuit: bool = False) -> str:
         main_lines.append("")
         feature_lookups.append("ExpandState")
 
+        # MergeAll
+        main_lines.append("lookup MergeAll {")
+        for bit in (0, 1):
+            for length in range(MAX_LEN + 1):
+                p55_name = g_p(PARITY_BITS - 1, bit)
+                fused_name = f"qr_base_p55_{bit}_{length:02d}"
+                main_lines.append(
+                    f"    sub {p55_name} qr_base_{length:02d} by {fused_name};"
+                )
+        main_lines.append("} MergeAll;")
+        main_lines.append("")
+        feature_lookups.append("MergeAll")
+
+
+
     # Add main lines to all_lines
     all_lines.extend(main_lines)
 
@@ -875,14 +914,6 @@ def generate_features(include_parity_circuit: bool = False) -> str:
     all_lines.append("} rlig;")
     all_lines.append("")
 
-    all_lines.append(class_line("qr_internal", grouped_internal_glyphs(include_parity_circuit)))
-    all_lines.append(class_line("qr_any", grouped_any_glyphs(include_parity_circuit)))
-    all_lines.append(class_line("qr_follow", grouped_follow_glyphs(include_parity_circuit)))
-
-    all_lines.append("feature kern {")
-    all_lines.append(f"    pos @qr_internal <0 0 {-ADVANCE} 0> @qr_follow;")
-    all_lines.append("} kern;")
-    all_lines.append("")
 
     return "\n".join(all_lines)
 
@@ -999,7 +1030,7 @@ def main() -> None:
     for stale_font in DIST.glob("qrfont*.ttf"):
         stale_font.unlink()
 
-    for label in ("1L", "2L", "3L"):
+    for label in ("1L", "2L"):
         configure_qr(label)
         print(f"building QR Font {label}...", flush=True)
         font_data = build_font_data(args.base_font)

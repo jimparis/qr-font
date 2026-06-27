@@ -250,6 +250,18 @@ A more complete font could add:
 
 Automatic mask selection is possible using more unrolled Boolean circuitry, but it would probably exceed the Reed–Solomon portion in complexity. For the initial font, choosing a fixed mask and baking its format bits and coordinate inversions into the glyphs is far simpler.
 
+## Browser Layout & Rendering Caveats
+
+### Firefox Subpixel Alignment
+In layout engines (particularly Gecko/Firefox), zero-advance glyphs classified as GDEF Marks undergo subpixel rounding and snapping relative to their nearest Base glyph. If a font mixes Base glyphs (e.g., data bits with positive `hmtx` advance kerned back via GPOS) and Mark glyphs (e.g., parity bits with zero `hmtx` advance), the subpixel rounding logic causes the Mark sections to drift horizontally from the Base sections as the font size changes.
+* **Solution:** We omit the GDEF table and configure all intermediate QR glyphs (`header_bits`, `byte_XX`, `pXX`, `sXX`) to have native `0` advance in the `hmtx` table. The closing base glyph (`qr_base_NN` or `qr_base_p55_NN`) is the only glyph with a positive `ADVANCE` width. Because there are no GPOS positioning adjustments, the browser treats them all as zero-advance Base glyphs, eliminating horizontal misalignment entirely.
+
+### Line-Breaking Limitations
+Web browsers execute line-breaking algorithms (such as Unicode UAX #14) on the raw Unicode character sequence *before* invoking the font shaper (HarfBuzz).
+* **Chrome (Blink):** Splits the Unicode text at break opportunities (like spaces, dots, or slashes) into separate text runs, and then shapes each run independently. Because the second run lacks the opening delimiter `[`, it renders as plain text (e.g., `coded]`).
+* **Firefox (Gecko):** Shapes the text and then splits the shaped glyph run. Because line-breaking happens prior to font shaper execution, font-level GSUB ligatures designed to fuse breaking characters with their neighbors cannot prevent the browser from wrapping the line.
+* **Mitigation:** For reliable rendering in HTML, the bracketed block must be wrapped in a container that disables wrapping (e.g., `white-space: nowrap` or `display: inline-block`).
+
 So the basic answer is: **compile a fixed-capacity QR encoder into thousands of ordered contextual substitutions, represent every intermediate bit as a glyph identity, and overlay position-specific square outlines to produce the final matrix.** It is not an unrestricted program running inside ordinary OpenType, but for a bounded input size it is a legitimate and implementable finite computation.
 
 [1]: https://learn.microsoft.com/en-us/typography/opentype/otspec180/gsub?utm_source=chatgpt.com "GSUB — Glyph Substitution Table (OpenType 1.8) - Typography | Microsoft Learn"

@@ -94,3 +94,17 @@ characters. Supporting multiple QR versions in one font is possible, but would
 require branching by payload length at close-delimiter time and emitting
 version-specific base patterns, coordinate maps, RS parity circuits, and
 advances. The current simpler strategy is one fixed QR version for all payloads.
+
+## Browser Layout, Alignment, and Line-Breaking Details
+
+### Firefox Alignment Issue
+- **Symptom:** Horizontal shifting/slicing between the top/bottom (parity) and middle (data) sections of the QR code when resizing the font in Firefox.
+- **Cause:** Parity/state glyphs were classified as GDEF Marks and had zero-advance in `hmtx`. Firefox applies subpixel snapping/rounding to zero-advance GDEF Marks differently from standard spacing Base glyphs, causing horizontal coordinate drift.
+- **Solution:** We omit the GDEF table and configure all intermediate QR-related glyphs (`header_bits`, `byte_XX`, `pXX`, `sXX`) to have native `0` advance in the `hmtx` table. The closing base glyph (`qr_base_NN` or `qr_base_p55_NN`) is the only glyph with a positive `ADVANCE` width. Because there are no GPOS positioning adjustments, the browser treats them all as zero-advance Base glyphs, eliminating horizontal misalignment entirely.
+
+### Line-Breaking Limitations
+- **Symptom:** QR codes containing spaces, dots, or slashes split across lines. In Chrome, the second half of the split QR code renders as plain text (e.g., `coded]`). In Firefox, it splits the shaped QR code.
+- **Cause:** Web browsers run line-breaking algorithms (Unicode UAX #14) on the raw Unicode text BEFORE they run the font shaper (HarfBuzz). Because line-breaking is decided on Unicode characters before GSUB/GPOS run, font-level ligatures designed to ligate breaking characters to their neighbors cannot prevent browser wrapping.
+- **Chrome Behavior:** Chrome splits the string into two independent lines and shapes them separately. Since the second line lacks `[`, it remains plain text.
+- **Firefox Behavior:** Firefox shapes first and then splits the shaped glyph run.
+- **Rule of Thumb:** Always wrap QR-coded elements in a CSS container with `white-space: nowrap` or `display: inline-block` to avoid breaks, as the font itself cannot override Unicode line-breaking properties.
