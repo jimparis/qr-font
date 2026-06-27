@@ -7,13 +7,13 @@ all:
 	uv run tools/build_font.py
 	mkdir -p $(HOME)/Downloads/qrfont
 	rm -f $(HOME)/Downloads/qrfont/qrfont*.ttf
-	cp dist/qrfont*.ttf dist/demo.html dist/reference.html LICENSE-OFL.txt NOTICE.md $(HOME)/Downloads/qrfont/
+	cp dist/qrfont*.ttf dist/demo.html LICENSE-OFL.txt NOTICE.md $(HOME)/Downloads/qrfont/
 
 fast-placeholder:
 	uv run tools/build_font.py --placeholder-parity
 	mkdir -p $(HOME)/Downloads/qrfont
 	rm -f $(HOME)/Downloads/qrfont/qrfont*.ttf
-	cp dist/qrfont*.ttf dist/demo.html dist/reference.html LICENSE-OFL.txt NOTICE.md $(HOME)/Downloads/qrfont/
+	cp dist/qrfont*.ttf dist/demo.html LICENSE-OFL.txt NOTICE.md $(HOME)/Downloads/qrfont/
 
 full-parity: all
 

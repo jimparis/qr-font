@@ -9,9 +9,9 @@ abc[hello]ghi
 
 The first target is intentionally bounded:
 
-- QR Code Version 1-L, 21 by 21 modules
+- QR Code Version 3-L, 29 by 29 modules
 - byte mode
-- printable ASCII input, up to 17 characters
+- printable ASCII input, up to 53 characters
 - fixed mask pattern 0
 - `[` and `]` as delimiters
 
@@ -91,4 +91,4 @@ licensed under the SIL Open Font License, Version 1.1. See
 
 This is a proof-of-concept font. It relies on OpenType shaping, so it needs an
 environment that applies GSUB features to the font. Inputs inside a QR block
-are bounded to printable ASCII, up to 17 characters.
+are bounded to printable ASCII, up to 53 characters.

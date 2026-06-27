@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -24,21 +23,54 @@ DEFAULT_BASE_FONT = Path("/usr/share/fonts/truetype/liberation/LiberationSans-Re
 
 MODULE = 100
 QUIET = 4
-QR_SIZE = 21
-ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
-UNITS_PER_EM = ADVANCE
-ASCENT = ADVANCE
-DESCENT = 0
-MAX_LEN = 17
-DATA_BITS = 152
-PARITY_BITS = 56
-TOTAL_BITS = DATA_BITS + PARITY_BITS
 MASK = 0
 RENDER_X_BIAS = 0
 MODULE_OVERPAINT = 8
 SUPPORTED_CODES = [c for c in range(32, 127) if c not in (ord("["), ord("]"))]
 LATIN_SCALE = 0.20
 LATIN_Y_SHIFT = 220
+
+QR_CONFIGS = {
+    "1L": {"version": 1, "size": 21, "data_codewords": 19, "ec_codewords": 7, "max_len": 17},
+    "2L": {"version": 2, "size": 25, "data_codewords": 34, "ec_codewords": 10, "max_len": 32},
+    "3L": {"version": 3, "size": 29, "data_codewords": 55, "ec_codewords": 15, "max_len": 53},
+}
+
+QR_LABEL = "1L"
+QR_VERSION = 1
+QR_SIZE = 21
+ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
+UNITS_PER_EM = ADVANCE
+ASCENT = ADVANCE
+DESCENT = 0
+MAX_LEN = 17
+DATA_CODEWORDS = 19
+EC_CODEWORDS = 7
+DATA_BITS = DATA_CODEWORDS * 8
+PARITY_BITS = EC_CODEWORDS * 8
+TOTAL_BITS = DATA_BITS + PARITY_BITS
+RS_GEN: list[int] = []
+
+
+def configure_qr(label: str) -> None:
+    global QR_LABEL, QR_VERSION, QR_SIZE, ADVANCE, UNITS_PER_EM, ASCENT, DESCENT
+    global MAX_LEN, DATA_CODEWORDS, EC_CODEWORDS, DATA_BITS, PARITY_BITS, TOTAL_BITS, RS_GEN
+
+    config = QR_CONFIGS[label]
+    QR_LABEL = label
+    QR_VERSION = config["version"]
+    QR_SIZE = config["size"]
+    ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
+    UNITS_PER_EM = ADVANCE
+    ASCENT = ADVANCE
+    DESCENT = 0
+    MAX_LEN = config["max_len"]
+    DATA_CODEWORDS = config["data_codewords"]
+    EC_CODEWORDS = config["ec_codewords"]
+    DATA_BITS = DATA_CODEWORDS * 8
+    PARITY_BITS = EC_CODEWORDS * 8
+    TOTAL_BITS = DATA_BITS + PARITY_BITS
+    RS_GEN = rs_generator(EC_CODEWORDS)
 
 
 def g_char(code: int) -> str:
@@ -108,10 +140,9 @@ def rs_generator(ec_count: int) -> list[int]:
     return gen
 
 
-RS_GEN = rs_generator(7)
-
-
-def rs_encode(data: list[int], ec_count: int = 7) -> list[int]:
+def rs_encode(data: list[int], ec_count: int | None = None) -> list[int]:
+    if ec_count is None:
+        ec_count = EC_CODEWORDS
     ecc = [0] * ec_count
     for value in data:
         factor = value ^ ecc[0]
@@ -119,6 +150,9 @@ def rs_encode(data: list[int], ec_count: int = 7) -> list[int]:
         for i in range(ec_count):
             ecc[i] ^= gf_mul(RS_GEN[i + 1], factor)
     return ecc
+
+
+configure_qr("1L")
 
 
 def data_bits_for_text(text: str) -> list[int]:
@@ -216,6 +250,27 @@ def finder_modules(top: int, left: int) -> set[tuple[int, int]]:
     return black
 
 
+def alignment_modules(center_row: int, center_col: int) -> set[tuple[int, int]]:
+    black: set[tuple[int, int]] = set()
+    for row in range(center_row - 2, center_row + 3):
+        for col in range(center_col - 2, center_col + 3):
+            dr = abs(row - center_row)
+            dc = abs(col - center_col)
+            if dr == 2 or dc == 2 or (dr == 0 and dc == 0):
+                black.add((row, col))
+    return black
+
+
+def alignment_centers() -> list[tuple[int, int]]:
+    if QR_VERSION == 1:
+        return []
+    if QR_VERSION == 2:
+        return [(18, 18)]
+    if QR_VERSION == 3:
+        return [(22, 22)]
+    raise ValueError("Only QR versions 1, 2, and 3 are implemented")
+
+
 def reserved_matrix() -> list[list[bool]]:
     reserved = [[False] * QR_SIZE for _ in range(QR_SIZE)]
 
@@ -223,9 +278,14 @@ def reserved_matrix() -> list[list[bool]]:
         if 0 <= row < QR_SIZE and 0 <= col < QR_SIZE:
             reserved[row][col] = True
 
-    for top, left in ((0, 0), (0, 14), (14, 0)):
+    for top, left in ((0, 0), (0, QR_SIZE - 7), (QR_SIZE - 7, 0)):
         for row in range(top - 1, top + 8):
             for col in range(left - 1, left + 8):
+                reserve(row, col)
+
+    for center_row, center_col in alignment_centers():
+        for row in range(center_row - 2, center_row + 3):
+            for col in range(center_col - 2, center_col + 3):
                 reserve(row, col)
 
     for i in range(QR_SIZE):
@@ -241,11 +301,11 @@ def reserved_matrix() -> list[list[bool]]:
     for row in range(QR_SIZE - 7, QR_SIZE):
         reserve(row, 8)
 
-    reserve(13, 8)
+    reserve(4 * QR_VERSION + 9, 8)
     return reserved
 
 
-def data_coordinates() -> list[tuple[int, int]]:
+def all_data_coordinates() -> list[tuple[int, int]]:
     reserved = reserved_matrix()
     coords: list[tuple[int, int]] = []
     upward = True
@@ -260,9 +320,18 @@ def data_coordinates() -> list[tuple[int, int]]:
                     coords.append((row, c))
         upward = not upward
         col -= 2
-    if len(coords) != TOTAL_BITS:
-        raise RuntimeError(f"expected {TOTAL_BITS} data coordinates, got {len(coords)}")
     return coords
+
+
+def data_coordinates() -> list[tuple[int, int]]:
+    coords = all_data_coordinates()
+    if len(coords) < TOTAL_BITS:
+        raise RuntimeError(f"expected at least {TOTAL_BITS} data coordinates, got {len(coords)}")
+    return coords[:TOTAL_BITS]
+
+
+def remainder_coordinates() -> list[tuple[int, int]]:
+    return all_data_coordinates()[TOTAL_BITS:]
 
 
 def format_bits() -> list[int]:
@@ -280,21 +349,26 @@ def format_bits() -> list[int]:
 def base_black_modules() -> set[tuple[int, int]]:
     black: set[tuple[int, int]] = set()
     black |= finder_modules(0, 0)
-    black |= finder_modules(0, 14)
-    black |= finder_modules(14, 0)
+    black |= finder_modules(0, QR_SIZE - 7)
+    black |= finder_modules(QR_SIZE - 7, 0)
+    for center_row, center_col in alignment_centers():
+        black |= alignment_modules(center_row, center_col)
 
-    for i in range(8, 13):
+    for i in range(8, QR_SIZE - 8):
         if i % 2 == 0:
             black.add((6, i))
             black.add((i, 6))
 
-    black.add((13, 8))
+    black.add((4 * QR_VERSION + 9, 8))
+    for row, col in remainder_coordinates():
+        if is_masked(row, col):
+            black.add((row, col))
 
     fmt = format_bits()
     first = [(8, 0), (8, 1), (8, 2), (8, 3), (8, 4), (8, 5), (8, 7), (8, 8),
              (7, 8), (5, 8), (4, 8), (3, 8), (2, 8), (1, 8), (0, 8)]
-    second = [(20, 8), (19, 8), (18, 8), (17, 8), (16, 8), (15, 8), (14, 8),
-              (8, 13), (8, 14), (8, 15), (8, 16), (8, 17), (8, 18), (8, 19), (8, 20)]
+    second = [(QR_SIZE - 1 - i, 8) for i in range(7)]
+    second.extend((8, QR_SIZE - 8 + i) for i in range(8))
     for bit, coord in zip(fmt, first):
         if bit:
             black.add(coord)
@@ -396,6 +470,9 @@ def build_font_data(base_font_path: Path = DEFAULT_BASE_FONT) -> FontData:
         add_empty(g_c(i), data)
     for n in range(MAX_LEN + 1):
         add_empty(g_len(n), data)
+    for j in range(EC_CODEWORDS):
+        for val in range(256):
+            add_empty(f"s{j}_{val:03d}", data)
     for pos in range(MAX_LEN):
         for code in SUPPORTED_CODES:
             name = g_byte(pos, code)
@@ -457,23 +534,33 @@ def class_line(name: str, members: Iterable[str]) -> str:
     return f"@{name} = [{' '.join(members)}];"
 
 
-def grouped_internal_glyphs() -> list[str]:
+def grouped_internal_glyphs(include_parity_circuit: bool = False) -> list[str]:
     names = ["header_bits"]
     for pos in range(MAX_LEN):
         names.extend(g_byte(pos, code) for code in SUPPORTED_CODES)
     for length in range(MAX_LEN + 1):
-        names.extend((f"count_{length:02d}", f"tail_{length:02d}", f"parity_zero_{length:02d}"))
+        names.extend((f"count_{length:02d}", f"tail_{length:02d}"))
+        if not include_parity_circuit:
+            names.append(f"parity_zero_{length:02d}")
     return names
 
 
-def grouped_any_glyphs() -> list[str]:
-    names = grouped_internal_glyphs()
+def grouped_any_glyphs(include_parity_circuit: bool = False) -> list[str]:
+    names = grouped_internal_glyphs(include_parity_circuit)
     names.extend(f"qr_base_{length:02d}" for length in range(MAX_LEN + 1))
     return names
 
 
-def grouped_follow_glyphs() -> list[str]:
-    return ["empty", *grouped_any_glyphs()]
+def grouped_follow_glyphs(include_parity_circuit: bool = False) -> list[str]:
+    names = ["empty", *grouped_any_glyphs(include_parity_circuit)]
+    if include_parity_circuit:
+        for j in range(EC_CODEWORDS):
+            for val in range(256):
+                names.append(f"s{j}_{val:03d}")
+        for i in range(PARITY_BITS):
+            for bit in (0, 1):
+                names.append(g_p(i, bit))
+    return names
 
 
 def is_qr_render_glyph(name: str) -> bool:
@@ -511,190 +598,293 @@ def close_tail_bits(length: int) -> list[int]:
         i += 1
     return bits
 
+
 def grouped_close_payload(length: int) -> list[str]:
     return [f"count_{length:02d}", f"tail_{length:02d}", f"parity_zero_{length:02d}", f"qr_base_{length:02d}"]
 
 
-def bit_close_payload(length: int) -> list[str]:
-    used = 12 + length * 8
-    payload = [g_d(used + i, bit) for i, bit in enumerate(close_tail_bits(length))]
-    payload.extend(g_p(i, 0) for i in range(PARITY_BITS))
-    payload.append(f"qr_base_{length:02d}")
-    return payload
+def parity_contribution_for_byte(pos: int, code: int, matrix: list[list[int]]) -> list[int]:
+    start = 12 + pos * 8
+    bits = bits_of(code, 8)
+    contribution = [0] * PARITY_BITS
+    for i, bit in enumerate(bits):
+        if bit:
+            column = matrix[start + i]
+            for p in range(PARITY_BITS):
+                contribution[p] ^= column[p]
+    return contribution
 
 
-def data_context_parts(length: int, focus_index: int) -> list[str]:
-    def data_part(index: int) -> str:
-        return g_d(index, 1) if index == focus_index else f"@d{index:03d}"
-
-    parts = [data_part(i) for i in range(12)]
-    for pos in range(length):
-        parts.append("empty")
-        start = 12 + pos * 8
-        parts.extend(data_part(i) for i in range(start, start + 8))
-    used = 12 + length * 8
-    parts.append("empty")
-    parts.extend(data_part(i) for i in range(used, DATA_BITS))
-    return parts
+def fixed_parity_contribution(length: int, matrix: list[list[int]]) -> list[int]:
+    fixed_bits = [0] * DATA_BITS
+    
+    # Mode: 0, 1, 0, 0
+    mode = [0, 1, 0, 0]
+    for i in range(4):
+        fixed_bits[i] = mode[i]
+        
+    # Length:
+    len_bits = bits_of(length, 8)
+    for i in range(8):
+        fixed_bits[4 + i] = len_bits[i]
+        
+    # Tail/padding:
+    tail = close_tail_bits(length)
+    start = 12 + length * 8
+    for i, bit in enumerate(tail):
+        fixed_bits[start + i] = bit
+        
+    # XOR sum of columns of the matrix for all fixed bits that are 1:
+    contribution = [0] * PARITY_BITS
+    for i in range(DATA_BITS):
+        if fixed_bits[i]:
+            column = matrix[i]
+            for p in range(PARITY_BITS):
+                contribution[p] ^= column[p]
+    return contribution
 
 
 def generate_features(include_parity_circuit: bool = False) -> str:
     languagesystems = ["languagesystem DFLT dflt;", "languagesystem latn dflt;", ""]
-    lines: list[str] = [*languagesystems]
+    
+    # We will build all_lines from the ground up
+    all_lines: list[str] = [*languagesystems]
 
+    # 1. Define classes first!
     for pos in range(MAX_LEN):
-        lines.append(class_line(f"byte_{pos:02d}", (g_byte(pos, c) for c in SUPPORTED_CODES)))
-    for i in range(DATA_BITS):
-        lines.append(class_line(f"d{i:03d}", (g_d(i, 0), g_d(i, 1))))
-    for i in range(PARITY_BITS):
-        lines.append(class_line(f"p{i:02d}", (g_p(i, 0), g_p(i, 1))))
-    lines.append("")
-
+        all_lines.append(class_line(f"byte_{pos:02d}", (g_byte(pos, c) for c in SUPPORTED_CODES)))
     if include_parity_circuit:
-        open_replacement = "d000_0 d001_1 d002_0 d003_0 c00 c01 c02 c03 c04 c05 c06 c07 len_00"
+        # Define parity classes
+        for i in range(PARITY_BITS):
+            all_lines.append(class_line(f"p{i:02d}", (g_p(i, 0), g_p(i, 1))))
+        # Define state classes and their XOR permutations
+        for j in range(EC_CODEWORDS):
+            all_lines.append(class_line(f"s{j}", (f"s{j}_{val:03d}" for val in range(256))))
+            for contrib in range(1, 256):
+                permuted_glyphs = [f"s{j}_{val ^ contrib:03d}" for val in range(256)]
+                all_lines.append(class_line(f"s{j}_x{contrib:03d}", permuted_glyphs))
+            
+    all_lines.append(class_line("SUPPORTED_CHARS", (g_char(c) for c in SUPPORTED_CODES)))
+    all_lines.append("")
+
+    # 2. Generate NoOp, XorS, and helper lookups
+    helper_lookups: list[str] = []
+    if include_parity_circuit:
+        # Generate NoOp lookup using class-to-class identity substitutions and useExtension
+        helper_lookups.append("lookup NoOp useExtension {")
+        for j in range(EC_CODEWORDS):
+            helper_lookups.append(f"    sub @s{j} by @s{j};")
+        for pos in range(MAX_LEN):
+            helper_lookups.append(f"    sub @byte_{pos:02d} by @byte_{pos:02d};")
+        helper_lookups.append("} NoOp;")
+        helper_lookups.append("")
+
+        # Generate Xor lookups using class-to-class substitutions and useExtension
+        for contrib in range(1, 256):
+            lookup_name = f"Xor_{contrib:03d}"
+            helper_lookups.append(f"lookup {lookup_name} useExtension {{")
+            for j in range(EC_CODEWORDS):
+                helper_lookups.append(f"    sub @s{j} by @s{j}_x{contrib:03d};")
+            helper_lookups.append(f"}} {lookup_name};")
+            helper_lookups.append("")
+                
+
+
+    # Generate Scan helper lookups
+    if include_parity_circuit:
+        # Pre-generate SetByte lookups (combined per character to reduce lookup count)
+        for code in SUPPORTED_CODES:
+            a = f"SetByte_{code:03d}"
+            helper_lookups.append(
+                f"lookup {a} useExtension {{ "
+                + " ".join(f"sub len_{pos:02d} by {g_byte(pos, code)};" for pos in range(MAX_LEN))
+                + f" }} {a};"
+            )
+        # Pre-generate SetLen lookups
+        for pos in range(MAX_LEN):
+            b = f"SetLen{pos + 1:02d}"
+            helper_lookups.append(
+                f"lookup {b} useExtension {{ sub @SUPPORTED_CHARS by len_{pos+1:02d}; }} {b};"
+            )
+    else:
+        # Placeholder Scan helper lookups (combined to reduce lookup count)
+        for code in SUPPORTED_CODES:
+            a = f"SetByte_{code:03d}"
+            b = f"SetLen_{code:03d}"
+            helper_lookups.extend([
+                f"lookup {a} useExtension {{ "
+                + " ".join(f"sub {g_len(pos)} by {g_byte(pos, code)};" for pos in range(MAX_LEN))
+                + f" }} {a};",
+                f"lookup {b} useExtension {{ "
+                + " ".join(f"sub {g_char(code)} by {g_len(pos + 1)};" for pos in range(MAX_LEN))
+                + f" }} {b};",
+            ])
+
+    # Generate Close helper lookups
+    if include_parity_circuit:
+        # Pre-generate SetCountTail lookups
+        for length in range(MAX_LEN + 1):
+            helper_lookups.append(
+                f"lookup SetCountTail_{length:02d} useExtension {{ "
+                f"sub len_{length:02d} by count_{length:02d} tail_{length:02d}; "
+                f"}} SetCountTail_{length:02d};"
+            )
+        # Pre-generate SetBase lookups
+        for length in range(MAX_LEN + 1):
+            helper_lookups.append(
+                f"lookup SetBase_{length:02d} useExtension {{ "
+                f"sub close_delim by qr_base_{length:02d}; "
+                f"}} SetBase_{length:02d};"
+            )
+    else:
+        # Placeholder Close helper lookups
+        helper_lookups.append("lookup HideClose useExtension {")
+        helper_lookups.append("    sub close_delim by empty;")
+        helper_lookups.append("} HideClose;")
+        helper_lookups.append("")
+        for length in range(MAX_LEN + 1):
+            name = f"Close{length:02d}"
+            helper_lookups.append(f"lookup {name} useExtension {{")
+            close_payload = grouped_close_payload(length)
+            helper_lookups.append(f"    sub {g_len(length)} by {' '.join(close_payload)};")
+            helper_lookups.append(f"}} {name};")
+            helper_lookups.append("")
+
+    # Add all helper lookups to all_lines
+    all_lines.extend(helper_lookups)
+
+    # 3. Main lookups (OpenQR, Scan{pos}, CloseQR)
+    main_lines: list[str] = []
+    
+    # OpenQR
+    if include_parity_circuit:
+        open_replacement = "header_bits len_00 " + " ".join(f"s{j}_000" for j in range(EC_CODEWORDS))
     else:
         open_replacement = "header_bits len_00"
-
-    lines.extend([
-        "lookup OpenQR {",
+    main_lines.extend([
+        "lookup OpenQR useExtension {",
         f"    sub open_delim by {open_replacement};",
         "} OpenQR;",
         "",
     ])
-
-    helper_lookups: list[str] = []
     feature_lookups: list[str] = ["OpenQR"]
 
-    for pos in range(MAX_LEN):
-        scan_name = f"Scan{pos:02d}"
-        hide_name = f"HideScanLen{pos:02d}"
-        lines.append(f"lookup {scan_name} {{")
-        for code in SUPPORTED_CODES:
-            a = f"SetByte{pos:02d}_{code:03d}"
-            helper_lookups.extend([
-                f"lookup {a} {{ sub {g_char(code)} by {g_byte(pos, code)} {g_len(pos + 1)}; }} {a};",
-            ])
-            lines.append(f"    sub {g_len(pos)} {g_char(code)}' lookup {a};")
-        lines.append(f"}} {scan_name};")
-        lines.append("")
-        lines.append(f"lookup {hide_name} {{")
-        lines.append(f"    sub {g_len(pos)}' @byte_{pos:02d} {g_len(pos + 1)} by empty;")
-        lines.append(f"}} {hide_name};")
-        lines.append("")
-        feature_lookups.append(scan_name)
-        feature_lookups.append(hide_name)
-
-    count_lookups: list[str] = []
-    for length in range(MAX_LEN + 1):
-        length_bits = bits_of(length, 8)
-        for cpos, bit in enumerate(length_bits):
-            name = f"SetCount{length:02d}_{cpos:02d}"
-            count_lookups.append(f"lookup {name} {{ sub {g_c(cpos)} by {g_d(4 + cpos, bit)}; }} {name};")
-
+    # Scan{pos}
     if include_parity_circuit:
-        for cpos in range(8):
-            lookup_name = f"FillCount{cpos:02d}"
-            lines.append(f"lookup {lookup_name} {{")
-            for length in range(MAX_LEN + 1):
-                tail = [g_c(i) for i in range(cpos + 1, 8)]
-                for i in range(length):
-                    tail.append("empty")
-                    tail.append(f"@byte_{i:02d}")
-                tail.append(g_len(length))
-                context_tail = " ".join(tail)
-                setter = f"SetCount{length:02d}_{cpos:02d}"
-                if context_tail:
-                    lines.append(f"    sub {g_c(cpos)}' lookup {setter} {context_tail};")
-                else:
-                    lines.append(f"    sub {g_c(cpos)}' lookup {setter};")
-            lines.append(f"}} {lookup_name};")
-            lines.append("")
-            feature_lookups.append(lookup_name)
-
-    lines.append("lookup ExpandBytes {")
-    for pos in range(MAX_LEN):
-        start = 12 + pos * 8
-        for code in SUPPORTED_CODES:
-            names = " ".join(g_d(start + i, bit) for i, bit in enumerate(bits_of(code, 8)))
-            lines.append(f"    sub {g_byte(pos, code)} by {names};")
-    lines.append("} ExpandBytes;")
-    lines.append("")
-
-    lines.append("lookup HideLen {")
-    for length in range(MAX_LEN + 1):
-        lines.append(f"    sub {g_len(length)} by empty;")
-    lines.append("} HideLen;")
-    lines.append("")
-
-    for length in range(MAX_LEN + 1):
-        name = f"Close{length:02d}"
-        lines.append(f"lookup {name} {{")
-        close_payload = bit_close_payload(length) if include_parity_circuit else grouped_close_payload(length)
-        lines.append(f"    sub close_delim by {' '.join(close_payload)};")
-        lines.append(f"}} {name};")
-        lines.append("")
-
-    lines.append("lookup CloseQR {")
-    for length in range(MAX_LEN + 1):
-        lines.append(f"    sub {g_len(length)}' lookup HideLen close_delim' lookup Close{length:02d};")
-    lines.append("} CloseQR;")
-    lines.append("")
-    feature_lookups.append("CloseQR")
-    if include_parity_circuit:
-        feature_lookups.append("ExpandBytes")
-
-    if include_parity_circuit:
-        for i in range(PARITY_BITS):
-            lines.extend([
-                f"lookup ToggleP{i:02d} {{",
-                f"    sub {g_p(i, 0)} by {g_p(i, 1)};",
-                f"    sub {g_p(i, 1)} by {g_p(i, 0)};",
-                f"}} ToggleP{i:02d};",
-                "",
-            ])
-
         matrix = derive_parity_matrix()
+        for pos in range(MAX_LEN):
+            scan_name = f"Scan{pos:02d}"
+            main_lines.append(f"lookup {scan_name} useExtension {{")
+            for code in SUPPORTED_CODES:
+                bit_contrib = parity_contribution_for_byte(pos, code, matrix)
+                byte_contrib = bytes_from_bits(bit_contrib)
+                rule_parts = []
+                
+                if pos == 0:
+                    rule_parts.append(f"len_{pos:02d}' lookup SetByte_{code:03d}")
+                    for j in range(EC_CODEWORDS):
+                        contrib = byte_contrib[j]
+                        if contrib:
+                            rule_parts.append(f"@s{j}' lookup Xor_{contrib:03d}")
+                        else:
+                            rule_parts.append(f"@s{j}' lookup NoOp")
+                    rule_parts.append(f"{g_char(code)}' lookup SetLen{pos + 1:02d}")
+                else:
+                    for j in range(EC_CODEWORDS):
+                        contrib = byte_contrib[j]
+                        if contrib:
+                            rule_parts.append(f"@s{j}' lookup Xor_{contrib:03d}")
+                        else:
+                            rule_parts.append(f"@s{j}' lookup NoOp")
+                    for k in range(1, pos):
+                        rule_parts.append(f"@byte_{k:02d}' lookup NoOp")
+                    rule_parts.append(f"len_{pos:02d}' lookup SetByte_{code:03d}")
+                    rule_parts.append(f"{g_char(code)}' lookup SetLen{pos + 1:02d}")
+                    
+                main_lines.append(f"    sub {' '.join(rule_parts)};")
+            main_lines.append(f"}} {scan_name};")
+            main_lines.append("")
+            feature_lookups.append(scan_name)
+    else:
+        for pos in range(MAX_LEN):
+            scan_name = f"Scan{pos:02d}"
+            main_lines.append(f"lookup {scan_name} useExtension {{")
+            for code in SUPPORTED_CODES:
+                a = f"SetByte_{code:03d}"
+                b = f"SetLen_{code:03d}"
+                main_lines.append(f"    sub {g_len(pos)}' lookup {a} {g_char(code)}' lookup {b};")
+            main_lines.append(f"}} {scan_name};")
+            main_lines.append("")
+            feature_lookups.append(scan_name)
+
+    # CloseQR
+    if include_parity_circuit:
+        matrix = derive_parity_matrix()
+        main_lines.append("lookup CloseQR useExtension {")
         for length in range(MAX_LEN + 1):
-            for data_index, parity_column in enumerate(matrix):
-                toggles = [i for i, bit in enumerate(parity_column) if bit]
-                if not toggles:
-                    continue
-                name = f"ApplyL{length:02d}D{data_index:03d}"
-                toggle_name = f"ToggleL{length:02d}D{data_index:03d}"
-                lines.append(f"lookup {toggle_name} {{")
-                for p in toggles:
-                    lines.append(f"    sub {g_p(p, 0)} by {g_p(p, 1)};")
-                    lines.append(f"    sub {g_p(p, 1)} by {g_p(p, 0)};")
-                lines.append(f"}} {toggle_name};")
-                lines.append("")
-                lines.append(f"lookup {name} {{")
-                parts = data_context_parts(length, data_index)
-                for p in range(PARITY_BITS):
-                    parts.append(f"@p{p:02d}' lookup {toggle_name}")
-                parts.append(f"qr_base_{length:02d}")
-                lines.append(f"    sub {' '.join(parts)};")
-                lines.append(f"}} {name};")
-                lines.append("")
-                feature_lookups.append(name)
+            bit_fixed = fixed_parity_contribution(length, matrix)
+            byte_fixed = bytes_from_bits(bit_fixed)
+            rule_parts = []
+            for j in range(EC_CODEWORDS):
+                contrib = byte_fixed[j]
+                if contrib:
+                    rule_parts.append(f"@s{j}' lookup Xor_{contrib:03d}")
+                else:
+                    rule_parts.append(f"@s{j}' lookup NoOp")
+            for k in range(1, length):
+                rule_parts.append(f"@byte_{k:02d}' lookup NoOp")
+            rule_parts.append(f"len_{length:02d}' lookup NoOp")
+            rule_parts.append(f"close_delim' lookup SetBase_{length:02d}")
+            main_lines.append(f"    sub {' '.join(rule_parts)};")
+        main_lines.append("} CloseQR;")
+        main_lines.append("")
+        feature_lookups.append("CloseQR")
 
-    all_lines = [*languagesystems]
-    all_lines.extend(helper_lookups)
-    all_lines.extend(count_lookups)
-    all_lines.extend(lines[2:])
+        main_lines.append("lookup CloseQR_CountTail useExtension {")
+        for length in range(MAX_LEN + 1):
+            main_lines.append(f"    sub len_{length:02d}' lookup SetCountTail_{length:02d} qr_base_{length:02d};")
+        main_lines.append("} CloseQR_CountTail;")
+        main_lines.append("")
+        feature_lookups.append("CloseQR_CountTail")
+    else:
+        main_lines.append("lookup CloseQR useExtension {")
+        for length in range(MAX_LEN + 1):
+            main_lines.append(f"    sub {g_len(length)}' lookup Close{length:02d} close_delim' lookup HideClose;")
+        main_lines.append("} CloseQR;")
+        main_lines.append("")
+        feature_lookups.append("CloseQR")
 
+    # Add ExpandState to main_lines and feature_lookups
+    if include_parity_circuit:
+        main_lines.append("lookup ExpandState useExtension {")
+        for j in range(EC_CODEWORDS):
+            for val in range(256):
+                bits = bits_of(val, 8)
+                target_glyphs = [g_p(j * 8 + b, bit) for b, bit in enumerate(bits)]
+                main_lines.append(f"    sub s{j}_{val:03d} by {' '.join(target_glyphs)};")
+        main_lines.append("} ExpandState;")
+        main_lines.append("")
+        feature_lookups.append("ExpandState")
+
+    # Add main lines to all_lines
+    all_lines.extend(main_lines)
+
+    # 4. Feature sections
     all_lines.append("feature rlig {")
     for name in feature_lookups:
         all_lines.append(f"    lookup {name};")
     all_lines.append("} rlig;")
     all_lines.append("")
-    if not include_parity_circuit:
-        all_lines.append(class_line("qr_internal", grouped_internal_glyphs()))
-        all_lines.append(class_line("qr_any", grouped_any_glyphs()))
-        all_lines.append(class_line("qr_follow", grouped_follow_glyphs()))
-        all_lines.append("feature kern {")
-        all_lines.append(f"    pos @qr_internal <0 0 {-ADVANCE} 0> @qr_follow;")
-        all_lines.append("} kern;")
-        all_lines.append("")
+
+    all_lines.append(class_line("qr_internal", grouped_internal_glyphs(include_parity_circuit)))
+    all_lines.append(class_line("qr_any", grouped_any_glyphs(include_parity_circuit)))
+    all_lines.append(class_line("qr_follow", grouped_follow_glyphs(include_parity_circuit)))
+
+    all_lines.append("feature kern {")
+    all_lines.append(f"    pos @qr_internal <0 0 {-ADVANCE} 0> @qr_follow;")
+    all_lines.append("} kern;")
+    all_lines.append("")
+
     return "\n".join(all_lines)
 
 
@@ -719,11 +909,11 @@ def build_ttf(font_data: FontData, feature_text: str, output: Path) -> None:
     )
     fb.setupNameTable(
         {
-            "familyName": "QR Font",
+            "familyName": f"QR Font {QR_LABEL}",
             "styleName": "Regular",
-            "uniqueFontIdentifier": "QR Font Regular 0.1",
-            "fullName": "QR Font Regular",
-            "psName": "QRFont-Regular",
+            "uniqueFontIdentifier": f"QR Font {QR_LABEL} Regular 0.1",
+            "fullName": f"QR Font {QR_LABEL} Regular",
+            "psName": f"QRFont-{QR_LABEL}-Regular",
             "version": "Version 0.1",
             "copyright": (
                 "Derived from Liberation Sans: digitized data copyright (c) 2010 "
@@ -734,7 +924,7 @@ def build_ttf(font_data: FontData, feature_text: str, output: Path) -> None:
             "licenseInfoURL": "https://scripts.sil.org/OFL",
         }
     )
-    fb.setupPost()
+    fb.setupPost(keepGlyphNames=True)
     font = fb.font
     gasp = newTable("gasp")
     gasp.gaspRange = {
@@ -748,7 +938,7 @@ def build_ttf(font_data: FontData, feature_text: str, output: Path) -> None:
     font.save(output)
 
 
-def write_demo(font_filename: str) -> None:
+def write_demo(font_filenames: dict[str, str]) -> None:
     html = """<!doctype html>
 <html lang="en">
 <head>
@@ -757,8 +947,16 @@ def write_demo(font_filename: str) -> None:
 <title>Jim's TrueType QR Code Font</title>
 <style>
 @font-face {
-  font-family: "QR Font";
-  src: url("./__FONT_FILENAME__") format("truetype");
+  font-family: "QR Font 1-L";
+  src: url("./__FONT_1L__") format("truetype");
+}
+@font-face {
+  font-family: "QR Font 2-L";
+  src: url("./__FONT_2L__") format("truetype");
+}
+@font-face {
+  font-family: "QR Font 3-L";
+  src: url("./__FONT_3L__") format("truetype");
 }
 body {
   margin: 0;
@@ -800,22 +998,48 @@ textarea {
   border-radius: 6px;
   font: 18px system-ui, sans-serif;
 }
+select {
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  border: 1px solid #b7c0cc;
+  border-radius: 6px;
+  font: 15px system-ui, sans-serif;
+}
 .qr {
   margin-top: 32px;
-  font-family: "QR Font";
   font-feature-settings: "rlig" 1, "kern" 1;
-  font-size: 203px;
   line-height: 1;
   color: #000;
   background: #fff;
   display: block;
   box-sizing: border-box;
   width: 100%;
-  min-height: 203px;
+  min-height: 222px;
   padding: 0;
   overflow-x: auto;
   overflow-y: auto;
   white-space: pre-wrap;
+}
+.qr.mode-1L {
+  font-family: "QR Font 1-L";
+  font-size: 203px;
+  min-height: 203px;
+}
+.qr.mode-2L {
+  font-family: "QR Font 2-L";
+  font-size: 198px;
+  min-height: 198px;
+}
+.qr.mode-3L {
+  font-family: "QR Font 3-L";
+  font-size: 222px;
+  min-height: 222px;
+}
+.qr.mode-mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  min-height: 198px;
+  padding: 16px;
 }
 .meta {
   margin-top: 10px;
@@ -838,32 +1062,49 @@ a {
   <h1>Jim's TrueType QR Code Font</h1>
   <p class="intro">This is a real TrueType/OpenType font that turns bracketed text into QR codes during text shaping. There is no separate image generation or preprocessing step: type text like <code>[hello]</code>, apply the font, and the font's built-in OpenType rules render the QR code.</p>
   <p class="intro">Because the QR code is still text, you can copy and paste the rendered QR block as ordinary characters, store it in plain text, or mix it inline with regular Latin text. Text outside brackets remains readable.</p>
+  <label for="mode">Font</label>
+  <select id="mode">
+    <option value="1L">QR Font 1-L (up to 17 characters)</option>
+    <option value="2L" selected>QR Font 2-L (up to 32 characters)</option>
+    <option value="3L">QR Font 3-L (up to 53 characters)</option>
+    <option value="mono">Mono</option>
+  </select>
   <label for="text">Text</label>
   <textarea id="text" autocomplete="off" spellcheck="false">Hello [QR coded] world!
 Download this font: [http://qr.jim.sh/]</textarea>
-  <p class="meta">Use printable ASCII inside square brackets, up to 17 characters per QR block. Text outside brackets remains ordinary Liberation Sans-derived text.</p>
-  <div id="qr" class="qr">Hello [QR coded] world!
+  <p class="meta">Use printable ASCII inside square brackets. QR Font 1-L supports up to 17 characters per block; QR Font 2-L supports up to 32; QR Font 3-L supports up to 53. Text outside brackets remains ordinary Liberation Sans-derived text.</p>
+  <div id="qr" class="qr mode-2L">Hello [QR coded] world!
 Download this font: [http://qr.jim.sh/]</div>
   <p class="links">
-    <a href="./__FONT_FILENAME__">Download the TrueType font</a>
+    <a href="./__FONT_1L__">Download QR Font 1-L</a>
+    <a href="./__FONT_2L__">Download QR Font 2-L</a>
+    <a href="./__FONT_3L__">Download QR Font 3-L</a>
     <a href="https://git.jim.sh/jim/qr-font.git">Source repository</a>
   </p>
 </main>
 <script>
 const input = document.getElementById("text");
+const mode = document.getElementById("mode");
 const qr = document.getElementById("qr");
 function render() {
   const value = input.value;
   qr.replaceChildren(document.createTextNode(value));
+  qr.className = `qr mode-${mode.value}`;
 }
 input.addEventListener("input", render);
 input.addEventListener("change", render);
 input.addEventListener("keyup", render);
+mode.addEventListener("change", render);
 render();
 </script>
 </body>
 </html>
-""".replace("__FONT_FILENAME__", font_filename)
+"""
+    html = (
+        html.replace("__FONT_1L__", font_filenames["1L"])
+        .replace("__FONT_2L__", font_filenames["2L"])
+        .replace("__FONT_3L__", font_filenames["3L"])
+    )
     (DIST / "demo.html").write_text(html, encoding="utf-8")
 
 
@@ -894,27 +1135,7 @@ def svg_for_text(text: str, size: int = 150) -> str:
     )
 
 
-def write_reference() -> None:
-    samples = ["hello", "world", "asdfasdfasdfasdf"]
-    cards = []
-    for sample in samples:
-        cards.append(f"<section><code>[{sample}]</code>{svg_for_text(sample)}</section>")
-    html = f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>QR Font Reference</title>
-<style>
-body {{ margin: 40px; font-family: system-ui, sans-serif; background: #f6f7f9; }}
-main {{ display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }}
-section {{ display: grid; gap: 8px; }}
-code {{ font: 14px ui-monospace, SFMono-Regular, Consolas, monospace; }}
-</style>
-</head>
-<body><main>{''.join(cards)}</main></body>
-</html>
-"""
-    (DIST / "reference.html").write_text(html, encoding="utf-8")
+
 
 
 def parse_args() -> argparse.Namespace:
@@ -942,18 +1163,23 @@ def main() -> None:
     args = parse_args()
     BUILD.mkdir(exist_ok=True)
     DIST.mkdir(exist_ok=True)
-    for stale_font in DIST.glob("qrfont-*.ttf"):
+    for stale_font in DIST.glob("qrfont*.ttf"):
         stale_font.unlink()
-    font_data = build_font_data(args.base_font)
-    feature_text = generate_features(include_parity_circuit=not args.placeholder_parity)
-    (BUILD / "qrfont.fea").write_text(feature_text, encoding="utf-8")
-    build_ttf(font_data, feature_text, DIST / "qrfont.ttf")
-    font_version = hashlib.sha256((DIST / "qrfont.ttf").read_bytes()).hexdigest()[:16]
-    font_filename = f"qrfont-{font_version}.ttf"
-    (DIST / font_filename).write_bytes((DIST / "qrfont.ttf").read_bytes())
-    write_demo(font_filename)
-    write_reference()
-    print(f"wrote {DIST / 'qrfont.ttf'}")
+
+    font_filenames: dict[str, str] = {}
+    for label in ("1L", "2L", "3L"):
+        configure_qr(label)
+        print(f"building QR Font {label}...", flush=True)
+        font_data = build_font_data(args.base_font)
+        feature_text = generate_features(include_parity_circuit=not args.placeholder_parity)
+        (BUILD / f"qrfont-{label}.fea").write_text(feature_text, encoding="utf-8")
+        output_name = f"qrfont-{label}.ttf"
+        build_ttf(font_data, feature_text, DIST / output_name)
+        font_filenames[label] = output_name
+        print(f"wrote {DIST / output_name}")
+
+    configure_qr("2L")
+    write_demo(font_filenames)
     print(f"wrote {DIST / 'demo.html'}")
 
 

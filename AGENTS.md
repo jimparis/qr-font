@@ -11,10 +11,10 @@ SIL Open Font License 1.1.
 
 The current bounded QR target is:
 
-- QR Code Version 1-L
+- QR Code Version 3-L
 - byte mode
 - fixed mask pattern 0
-- printable ASCII payloads up to 17 characters per bracketed block
+- printable ASCII payloads up to 53 characters per bracketed block
 - `[` and `]` delimiters
 
 Example:
@@ -89,9 +89,8 @@ screenshots in `~/Downloads`.
 
 ## Larger QR Codes
 
-Version 1-L only supports 17 byte-mode characters. Larger QR versions are
-possible, but the current implementation hardcodes Version 1 data capacity,
-coordinate placement, format layout, and Reed-Solomon parity size. Extending to
-larger versions means generating additional version-specific coordinate maps,
-capacity tables, RS block structures, alignment patterns, and much larger
-OpenType state/parity circuits.
+The current font is fixed to Version 3-L, which supports 53 byte-mode
+characters. Supporting multiple QR versions in one font is possible, but would
+require branching by payload length at close-delimiter time and emitting
+version-specific base patterns, coordinate maps, RS parity circuits, and
+advances. The current simpler strategy is one fixed QR version for all payloads.
