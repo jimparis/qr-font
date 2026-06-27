@@ -40,7 +40,7 @@ QR_LABEL = "1L"
 QR_VERSION = 1
 QR_SIZE = 21
 ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
-UNITS_PER_EM = ADVANCE
+UNITS_PER_EM = round(ADVANCE / 1.5)
 ASCENT = ADVANCE
 DESCENT = 0
 MAX_LEN = 17
@@ -61,7 +61,7 @@ def configure_qr(label: str) -> None:
     QR_VERSION = config["version"]
     QR_SIZE = config["size"]
     ADVANCE = (QR_SIZE + QUIET * 2) * MODULE
-    UNITS_PER_EM = ADVANCE
+    UNITS_PER_EM = round(ADVANCE / 1.5)
     ASCENT = ADVANCE
     DESCENT = 0
     MAX_LEN = config["max_len"]
