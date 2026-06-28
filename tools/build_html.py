@@ -260,6 +260,9 @@ function updateSize(value) {
   sizeInput.value = value;
   qr.style.fontSize = value + "px";
   qr.style.minHeight = value + "px";
+  if (applyInputFont.checked) {
+    input.style.fontSize = value + "px";
+  }
 }
 
 sizeSlider.addEventListener("input", (e) => updateSize(e.target.value));
@@ -288,8 +291,14 @@ const applyInputFont = document.getElementById("apply-input-font");
 function updateInputFont() {
   if (applyInputFont.checked) {
     input.className = `apply-qr mode-${mode.value}`;
+    input.style.fontSize = sizeSlider.value + "px";
+    input.style.lineHeight = "1.2";
+    qr.style.display = "none";
   } else {
     input.className = "";
+    input.style.fontSize = "";
+    input.style.lineHeight = "";
+    qr.style.display = "block";
   }
 }
 applyInputFont.addEventListener("change", updateInputFont);
