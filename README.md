@@ -1,4 +1,4 @@
-# QR Font
+# Jim's TrueType QR Code Font
 
 Live Demo: https://qr.jim.sh/
 
