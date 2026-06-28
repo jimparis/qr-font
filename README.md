@@ -14,12 +14,6 @@ text into a QR Code symbol while leaving surrounding text readable.
 abc[hello]ghi
 ```
 
-The generator supports three different QR versions depending on payload size:
-
-- **QR Font 1-L**: QR Version 1-L (21×21 modules, up to 17 characters)
-- **QR Font 2-L**: QR Version 2-L (25×25 modules, up to 32 characters)
-- **QR Font 3-L**: QR Version 3-L (29×29 modules, up to 53 characters)
-
 All fonts use:
 - Byte mode
 - Printable ASCII input
