@@ -9,12 +9,13 @@ text as QR Code symbols while keeping surrounding text readable. The generated
 font is a Modified Version of Liberation Sans Regular and is licensed under the
 SIL Open Font License 1.1.
 
-The current bounded QR target is:
+The bounded QR targets are:
 
-- QR Code Version 3-L
+- **QR Code Version 1-L** (up to 17 characters per block)
+- **QR Code Version 2-L** (up to 32 characters per block)
+- **QR Code Version 3-L** (up to 53 characters per block)
 - byte mode
 - fixed mask pattern 0
-- printable ASCII payloads up to 53 characters per bracketed block
 - `[` and `]` delimiters
 
 Example:
@@ -32,8 +33,9 @@ Use `uv` for Python commands and dependency management.
 make
 ```
 
-`make` runs the full Reed-Solomon parity build, then copies the font, demo,
-reference page, license, and notice into `~/Downloads/qrfont/`.
+`make` runs the full Reed-Solomon parity build and compiles the fonts and `index.html` demo into the `dist/` directory.
+
+Use `make deploy` to synchronize the built `dist/` assets directly to `psy:/www/qr/` (which cleans up stale/experimental remote files via `--delete`).
 
 Do not use the placeholder parity path for normal verification. It exists only
 as a legacy layout-debug target:
@@ -87,13 +89,7 @@ Browser rendering is useful but time-consuming. The user asked to skip routine
 Firefox rendering for now. If visual alignment regresses, inspect recent
 screenshots in `~/Downloads`.
 
-## Larger QR Codes
-
-The current font is fixed to Version 3-L, which supports 53 byte-mode
-characters. Supporting multiple QR versions in one font is possible, but would
-require branching by payload length at close-delimiter time and emitting
-version-specific base patterns, coordinate maps, RS parity circuits, and
-advances. The current simpler strategy is one fixed QR version for all payloads.
+We build three separate font families (`1-L`, `2-L`, `3-L`), each fixed to its respective QR version. Supporting multiple QR versions dynamically in a single font file is possible, but would require branching by payload length at close-delimiter time and emitting version-specific base patterns, coordinate maps, RS parity circuits, and advances. The current strategy compiles separate fonts for each version.
 
 ## Browser Layout, Alignment, and Line-Breaking Details
 
