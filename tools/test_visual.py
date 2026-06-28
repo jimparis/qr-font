@@ -3,8 +3,12 @@ import subprocess
 from pathlib import Path
 import shutil
 
-DIST = Path("/home/jim/git/qr-font/dist")
-ARTIFACTS = Path("/home/jim/.gemini/antigravity-cli/brain/b99818b3-5da0-4033-8da1-3a74b472fb71")
+DIST = Path(__file__).resolve().parent.parent / "dist"
+# Fallback for artifacts folder if home directory is different
+home_dir = Path.home()
+ARTIFACTS = home_dir / ".gemini/antigravity-cli/brain/b99818b3-5da0-4033-8da1-3a74b472fb71"
+if not ARTIFACTS.exists():
+    ARTIFACTS = Path("/tmp")
 PROFILE_DIR = Path("/tmp/ff_test_prof")
 TEST_HTML_PATH = Path("/tmp/test_visual.html")
 

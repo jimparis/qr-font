@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 import hashlib
 
-DIST = Path("/home/jim/git/qr-font/dist")
+DIST = Path(__file__).resolve().parent.parent / "dist"
 
 def file_hash(filepath: Path) -> str:
     if not filepath.exists():
