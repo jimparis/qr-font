@@ -244,7 +244,7 @@ This page: [http://qr.jim.sh/]</div>
     <a href="./__FONT_1L__">Download QR Font 1-L</a>
     <a href="./__FONT_2L__">Download QR Font 2-L</a>
     <a href="./__FONT_3L__">Download QR Font 3-L</a>
-    <a href="https://git.jim.sh/jim/qr-font.git">Source repository</a>
+    <a href="https://github.com/jimparis/qr-font">Source repository</a>
   </p>
 </main>
 <script>

@@ -1,5 +1,7 @@
 # QR Font
 
+**Live Demo:** [https://qr.jim.sh/](https://qr.jim.sh/)
+
 This repo generates an experimental OpenType font that turns bracket-delimited
 text into a QR Code symbol while leaving surrounding text readable.
 
