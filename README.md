@@ -1,7 +1,11 @@
 # QR Font
 
-**Live Demo:** [https://qr.jim.sh/](https://qr.jim.sh/)
-* **Downloads:** [QR Font 1-L (TTF)](https://qr.jim.sh/qrfont-1L.ttf) | [QR Font 2-L (TTF)](https://qr.jim.sh/qrfont-2L.ttf) | [QR Font 3-L (TTF)](https://qr.jim.sh/qrfont-3L.ttf)
+Live Demo: https://qr.jim.sh/
+
+Downloads:
+- [qrfont-1L.ttf](https://github.com/jimparis/qr-font/releases/latest/download/qrfont-1L.ttf) (21x21 modules, up to 17 characters)
+- [qrfont-2L.ttf](https://github.com/jimparis/qr-font/releases/latest/download/qrfont-2L.ttf) (25x25 modules, up to 32 characters)
+- [qrfont-3L.ttf](https://github.com/jimparis/qr-font/releases/latest/download/qrfont-3L.ttf) (29x29 modules, up to 53 characters)
 
 This repo generates an experimental OpenType font that turns bracket-delimited
 text into a QR Code symbol while leaving surrounding text readable.
