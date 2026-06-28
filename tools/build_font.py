@@ -1030,7 +1030,7 @@ def main() -> None:
     for stale_font in DIST.glob("qrfont*.ttf"):
         stale_font.unlink()
 
-    for label in ("1L", "2L"):
+    for label in ("1L", "2L", "3L"):
         configure_qr(label)
         print(f"building QR Font {label}...", flush=True)
         font_data = build_font_data(args.base_font)

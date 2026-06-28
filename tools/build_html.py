@@ -80,6 +80,21 @@ textarea {
   border-radius: 6px;
   font: 18px system-ui, sans-serif;
 }
+textarea.apply-qr {
+  font-feature-settings: "rlig" 1, "kern" 1;
+}
+textarea.apply-qr.mode-1L {
+  font-family: "QR Font 1-L", system-ui, sans-serif;
+}
+textarea.apply-qr.mode-2L {
+  font-family: "QR Font 2-L", system-ui, sans-serif;
+}
+textarea.apply-qr.mode-3L {
+  font-family: "QR Font 3-L", system-ui, sans-serif;
+}
+textarea.apply-qr.mode-sans {
+  font-family: "Liberation Sans", system-ui, sans-serif;
+}
 select {
   width: 100%;
   padding: 8px 10px;
@@ -209,6 +224,15 @@ a {
         <span style="font-size: 15px; color: #4b5563;">px</span>
       </div>
     </div>
+    <div class="control-group">
+      <label for="apply-input-font">Direct Input Font</label>
+      <div style="height: 38px; display: flex; align-items: center;">
+        <label style="font-weight: normal; margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="apply-input-font">
+          Apply QR font to textbox
+        </label>
+      </div>
+    </div>
   </div>
   <label for="text">Text</label>
   <textarea id="text" autocomplete="off" spellcheck="false">Hello [QR coded] world!
@@ -259,7 +283,20 @@ input.addEventListener("input", render);
 input.addEventListener("change", render);
 input.addEventListener("keyup", render);
 mode.addEventListener("change", render);
+
+const applyInputFont = document.getElementById("apply-input-font");
+function updateInputFont() {
+  if (applyInputFont.checked) {
+    input.className = `apply-qr mode-${mode.value}`;
+  } else {
+    input.className = "";
+  }
+}
+applyInputFont.addEventListener("change", updateInputFont);
+mode.addEventListener("change", updateInputFont);
+
 render();
+updateInputFont();
 </script>
 </body>
 </html>
